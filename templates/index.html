@@ -1,101 +1,661 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Raspberry Pi AI Car</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CAR//CTRL</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
-
 <style>
+  :root {
+    --neon: #00ffe7;
+    --red:  #ff2d55;
+    --dim:  #00ffe740;
+    --bg:   #070a0f;
+    --panel:#0d1117;
+    --border: #1a2535;
+    --text: #c8d8e8;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Orbitron', sans-serif;
+  }
 
-body{
-background:#111;
-color:white;
-text-align:center;
-font-family:Arial;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-#video{
-width:90%;
-max-width:420px;
-border-radius:10px;
-}
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 
-#joystick{
-width:220px;
-height:220px;
-margin:40px auto;
-}
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,231,0.015) 2px,
+      rgba(0,255,231,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
 
+  /* ---- HEADER ---- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--neon);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px var(--neon);
+  }
+
+  .logo span { color: var(--red); }
+
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: #4a6a7a;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: blink 1.5s infinite;
+  }
+  .dot.live { background: var(--neon); box-shadow: 0 0 8px var(--neon); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ---- MAIN LAYOUT ---- */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ---- VIDEO PANEL ---- */
+  .video-panel {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+  }
+
+  #stream {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: contrast(1.05) saturate(0.9);
+  }
+
+  .video-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Corner brackets */
+  .corner {
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: var(--neon);
+    border-style: solid;
+    opacity: 0.7;
+  }
+  .corner.tl { top:12px; left:12px; border-width: 2px 0 0 2px; }
+  .corner.tr { top:12px; right:12px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom:12px; left:12px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom:12px; right:12px; border-width: 0 2px 2px 0; }
+
+  .hud-text {
+    position: absolute;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: var(--neon);
+    opacity: 0.6;
+    text-shadow: 0 0 8px var(--neon);
+  }
+  .hud-tl { top: 16px; left: 44px; }
+  .hud-tr { top: 16px; right: 44px; text-align: right; }
+  .hud-bl { bottom: 16px; left: 44px; }
+  .hud-br { bottom: 16px; right: 44px; text-align: right; }
+
+  /* Crosshair */
+  .crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px; height: 30px;
+    opacity: 0.35;
+  }
+  .crosshair::before, .crosshair::after {
+    content: '';
+    position: absolute;
+    background: var(--neon);
+  }
+  .crosshair::before { width: 1px; height: 100%; left: 50%; top: 0; }
+  .crosshair::after  { height: 1px; width: 100%; top: 50%; left: 0; }
+
+  /* No signal */
+  .no-signal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    gap: 12px;
+    font-family: var(--display);
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: #2a3a4a;
+  }
+  .no-signal.hidden { display: none; }
+
+  /* ---- CONTROL PANEL ---- */
+  .ctrl-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    overflow-y: auto;
+  }
+
+  .section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-size: 0.55rem;
+    letter-spacing: 3px;
+    color: #3a5a6a;
+    margin-bottom: 12px;
+    font-family: var(--display);
+  }
+
+  /* Direction indicator */
+  .direction-display {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--neon);
+    text-shadow: 0 0 15px var(--neon);
+    letter-spacing: 3px;
+    min-height: 28px;
+    transition: all 0.1s;
+  }
+  .direction-display.stopped { color: #2a4a5a; text-shadow: none; }
+  .direction-display.moving  { animation: pulse-text 0.5s infinite alternate; }
+  @keyframes pulse-text { from{opacity:0.8} to{opacity:1} }
+
+  /* Arrow grid */
+  .arrow-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 6px;
+    aspect-ratio: 1;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+
+  .btn {
+    background: #0a1520;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: #4a7a8a;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .btn:active, .btn.active {
+    background: var(--dim);
+    border-color: var(--neon);
+    color: var(--neon);
+    box-shadow: 0 0 12px var(--dim), inset 0 0 8px rgba(0,255,231,0.1);
+  }
+
+  .btn.stop-btn {
+    background: rgba(255,45,85,0.08);
+    border-color: #2a1a20;
+    color: var(--red);
+    font-size: 0.65rem;
+    font-family: var(--display);
+    letter-spacing: 1px;
+  }
+  .btn.stop-btn:active, .btn.stop-btn.active {
+    background: rgba(255,45,85,0.2);
+    border-color: var(--red);
+    box-shadow: 0 0 12px rgba(255,45,85,0.3);
+  }
+
+  /* Joystick zone */
+  .joystick-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+  }
+
+  #joystick-zone {
+    width: 180px;
+    height: 180px;
+    position: relative;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: radial-gradient(circle at center, #0d1a22 0%, #070a0f 70%);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 0 0 4px #0a1118;
+  }
+
+  /* Telemetry */
+  .telem-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #0d1520;
+    font-size: 0.65rem;
+  }
+  .telem-row:last-child { border-bottom: none; }
+  .telem-key { color: #3a5a6a; letter-spacing: 1px; }
+  .telem-val { color: var(--neon); font-family: var(--display); font-size: 0.7rem; }
+  .telem-val.off { color: var(--red); }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: flex;
+    gap: 6px;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 7px;
+    background: #0a1520;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: #3a5a6a;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--dim);
+    border-color: var(--neon);
+    color: var(--neon);
+  }
+
+  /* Speed bar */
+  .speed-track {
+    height: 4px;
+    background: #0d1520;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .speed-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon), #00ffaa);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.2s;
+    box-shadow: 0 0 8px var(--neon);
+  }
+
+  /* Mobile layout */
+  @media (max-width: 600px) {
+    main {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    .video-panel {
+      height: 42vw;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .ctrl-panel { overflow-y: visible; }
+    .section { padding: 12px; }
+    #joystick-zone { width: 150px; height: 150px; }
+    .arrow-grid { max-width: 160px; }
+  }
 </style>
-
 </head>
-
 <body>
 
-<h2>🚗 Raspberry Pi Car Control</h2>
+<!-- HEADER -->
+<header>
+  <div class="logo">CAR<span>//</span>CTRL</div>
+  <div class="status-bar">
+    <div class="dot live" id="cam-dot"></div>
+    <span id="cam-status">CAMERA INIT...</span>
+    &nbsp;&nbsp;
+    <div class="dot live" style="animation-delay:.3s"></div>
+    <span id="sys-time">00:00:00</span>
+  </div>
+</header>
 
-<img id="video" src="/video">
+<!-- MAIN -->
+<main>
 
-<div id="joystick"></div>
+  <!-- VIDEO -->
+  <div class="video-panel">
+    <img id="stream" src="/video" alt="stream"
+         onload="camOnline()" onerror="camOffline()">
+
+    <div class="video-overlay">
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="crosshair"></div>
+      <div class="hud-text hud-tl">CAM_01 // LIVE</div>
+      <div class="hud-text hud-tr" id="hud-action">STANDBY</div>
+      <div class="hud-text hud-bl" id="hud-ip">192.168.1.2:8080</div>
+      <div class="hud-text hud-br" id="hud-fps">-- FPS</div>
+    </div>
+
+    <div class="no-signal" id="no-signal">
+      <div style="font-size:2rem">📡</div>
+      <div>NO SIGNAL</div>
+      <div style="font-size:0.55rem;margin-top:4px">ATTEMPTING RECONNECT...</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="ctrl-panel">
+
+    <!-- Direction display -->
+    <div class="section">
+      <div class="section-label">HEADING</div>
+      <div class="direction-display stopped" id="dir-label">STANDBY</div>
+      <div class="speed-track"><div class="speed-fill" id="speed-fill"></div></div>
+    </div>
+
+    <!-- Mode -->
+    <div class="section">
+      <div class="section-label">INPUT MODE</div>
+      <div class="mode-toggle">
+        <div class="mode-btn active" id="mode-joystick" onclick="setMode('joystick')">JOYSTICK</div>
+        <div class="mode-btn" id="mode-buttons" onclick="setMode('buttons')">D-PAD</div>
+      </div>
+    </div>
+
+    <!-- Joystick -->
+    <div class="section" id="joystick-section">
+      <div class="section-label">ANALOG CONTROL</div>
+      <div class="joystick-wrap">
+        <div id="joystick-zone"></div>
+      </div>
+    </div>
+
+    <!-- D-Pad buttons -->
+    <div class="section" id="dpad-section" style="display:none">
+      <div class="section-label">DIGITAL CONTROL</div>
+      <div class="arrow-grid">
+        <div></div>
+        <button class="btn" id="btn-forward"
+          onpointerdown="pressBtn('forward')" onpointerup="releaseBtn()"
+          onpointerleave="releaseBtn()">▲</button>
+        <div></div>
+        <button class="btn" id="btn-left"
+          onpointerdown="pressBtn('left')" onpointerup="releaseBtn()"
+          onpointerleave="releaseBtn()">◀</button>
+        <button class="btn stop-btn" id="btn-stop"
+          onpointerdown="pressBtn('stop')" onpointerup="releaseBtn()">STOP</button>
+        <button class="btn" id="btn-right"
+          onpointerdown="pressBtn('right')" onpointerup="releaseBtn()"
+          onpointerleave="releaseBtn()">▶</button>
+        <div></div>
+        <button class="btn" id="btn-backward"
+          onpointerdown="pressBtn('backward')" onpointerup="releaseBtn()"
+          onpointerleave="releaseBtn()">▼</button>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Telemetry -->
+    <div class="section" style="flex:1">
+      <div class="section-label">TELEMETRY</div>
+      <div class="telem-row">
+        <span class="telem-key">PLATFORM</span>
+        <span class="telem-val">RPi ZERO W</span>
+      </div>
+      <div class="telem-row">
+        <span class="telem-key">DRIVER</span>
+        <span class="telem-val">L293D</span>
+      </div>
+      <div class="telem-row">
+        <span class="telem-key">MOTOR A</span>
+        <span class="telem-val" id="tl-ma">IDLE</span>
+      </div>
+      <div class="telem-row">
+        <span class="telem-key">MOTOR B</span>
+        <span class="telem-val" id="tl-mb">IDLE</span>
+      </div>
+      <div class="telem-row">
+        <span class="telem-key">LAST CMD</span>
+        <span class="telem-val" id="tl-cmd">--</span>
+      </div>
+      <div class="telem-row">
+        <span class="telem-key">CMDS SENT</span>
+        <span class="telem-val" id="tl-count">0</span>
+      </div>
+    </div>
+
+  </div>
+</main>
 
 <script>
+// ---- STATE ----
+let lastCmd = "";
+let cmdCount = 0;
+let currentMode = "joystick";
+let fpsTimer = null;
+let frameCount = 0;
+let camOk = false;
 
-let lastCommand = "";
+// ---- CLOCK ----
+function updateClock() {
+  const now = new Date();
+  document.getElementById('sys-time').textContent =
+    now.toTimeString().slice(0,8);
+}
+setInterval(updateClock, 1000);
+updateClock();
 
-var manager = nipplejs.create({
-    zone: document.getElementById('joystick'),
-    mode: 'static',
-    position: { left: '50%', top: '50%' },
-    color: 'red',
-    size:150
+// ---- CAMERA STATUS ----
+function camOnline() {
+  camOk = true;
+  document.getElementById('no-signal').classList.add('hidden');
+  document.getElementById('cam-dot').classList.add('live');
+  document.getElementById('cam-status').textContent = 'LIVE';
+}
+function camOffline() {
+  camOk = false;
+  document.getElementById('no-signal').classList.remove('hidden');
+  document.getElementById('cam-dot').classList.remove('live');
+  document.getElementById('cam-status').textContent = 'NO SIGNAL';
+  setTimeout(() => {
+    const s = document.getElementById('stream');
+    s.src = '/video?' + Date.now();
+  }, 2000);
+}
+
+// ---- SEND COMMAND ----
+function send(action) {
+  if (action === lastCmd) return;
+  lastCmd = action;
+  cmdCount++;
+
+  // Update UI
+  const labels = {
+    forward:  '▲ FORWARD',
+    backward: '▼ REVERSE',
+    left:     '◀ LEFT',
+    right:    '▶ RIGHT',
+    stop:     'STANDBY'
+  };
+  const el = document.getElementById('dir-label');
+  el.textContent = labels[action] || 'STANDBY';
+  el.className = 'direction-display ' + (action === 'stop' ? 'stopped' : 'moving');
+
+  document.getElementById('hud-action').textContent = action.toUpperCase();
+  document.getElementById('tl-cmd').textContent = action.toUpperCase();
+  document.getElementById('tl-count').textContent = cmdCount;
+
+  // Motor telemetry
+  const motorA = {forward:'FWD', backward:'REV', left:'REV', right:'FWD', stop:'IDLE'};
+  const motorB = {forward:'FWD', backward:'REV', left:'FWD', right:'REV', stop:'IDLE'};
+  document.getElementById('tl-ma').textContent = motorA[action] || 'IDLE';
+  document.getElementById('tl-mb').textContent = motorB[action] || 'IDLE';
+
+  // Speed bar
+  document.getElementById('speed-fill').style.width =
+    action === 'stop' ? '0%' : '100%';
+
+  // Highlight active d-pad button
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById('btn-' + action);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // POST to server
+  fetch('/control', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action})
+  }).catch(() => {});
+}
+
+// ---- D-PAD ----
+function pressBtn(action) {
+  startHeartbeat(action);
+}
+function releaseBtn() {
+  stopHeartbeat();
+  send('stop');
+}
+
+// ---- MODE SWITCH ----
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-joystick').classList.toggle('active', mode === 'joystick');
+  document.getElementById('mode-buttons').classList.toggle('active', mode === 'buttons');
+  document.getElementById('joystick-section').style.display = mode === 'joystick' ? '' : 'none';
+  document.getElementById('dpad-section').style.display = mode === 'buttons' ? '' : 'none';
+}
+
+// ---- JOYSTICK ----
+const manager = nipplejs.create({
+  zone: document.getElementById('joystick-zone'),
+  mode: 'static',
+  position: { left: '50%', top: '50%' },
+  color: '#00ffe7',
+  size: 120,
+  dynamicPage: true
 });
 
-function send(action){
+// Heartbeat — keeps sending command while joystick held
+let heartbeat = null;
 
-    if(action === lastCommand){
-        return; // prevent duplicate commands
-    }
-
-    lastCommand = action;
-
-    fetch('/control',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:action})
-    });
+function startHeartbeat(action) {
+  stopHeartbeat();
+  send(action); // send immediately
+  heartbeat = setInterval(() => {
+    fetch('/control', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action})
+    }).catch(() => {});
+  }, 200); // repeat every 200ms while held
 }
 
-manager.on('move', function(evt,data){
-
-if(!data.angle){
-return;
+function stopHeartbeat() {
+  if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
 }
 
-var angle = data.angle.degree;
+manager.on('move', (evt, data) => {
+  if (!data.angle || !data.distance) return;
 
-if(angle >=45 && angle <135){
-send("forward");
-}
-else if(angle >=135 && angle <225){
-send("left");
-}
-else if(angle >=225 && angle <315){
-send("backward");
-}
-else{
-send("right");
-}
+  // Dead zone
+  if (data.distance < 15) {
+    stopHeartbeat();
+    send('stop');
+    return;
+  }
 
+  const a = data.angle.degree;
+  // 0=right  90=up  180=left  270=down
+  let action;
+  if      (a >= 60  && a < 120) action = 'forward';
+  else if (a >= 120 && a < 240) action = 'left';
+  else if (a >= 240 && a < 300) action = 'backward';
+  else                           action = 'right';
+
+  if (action !== lastCmd) startHeartbeat(action);
 });
 
-manager.on('end', function(){
-send("stop");
-lastCommand="";
+manager.on('end', () => {
+  stopHeartbeat();
+  send('stop');
+  lastCmd = "";
 });
 
+// ---- KEYBOARD ----
+const keyMap = {
+  ArrowUp:'forward', ArrowDown:'backward',
+  ArrowLeft:'left',  ArrowRight:'right',
+  KeyW:'forward',    KeyS:'backward',
+  KeyA:'left',       KeyD:'right'
+};
+const heldKeys = new Set();
+
+document.addEventListener('keydown', e => {
+  if (keyMap[e.code] && !heldKeys.has(e.code)) {
+    heldKeys.add(e.code);
+    send(keyMap[e.code]);
+  }
+});
+document.addEventListener('keyup', e => {
+  heldKeys.delete(e.code);
+  if (heldKeys.size === 0) send('stop');
+  else {
+    const remaining = [...heldKeys].find(k => keyMap[k]);
+    if (remaining) send(keyMap[remaining]);
+  }
+});
 </script>
-
 </body>
 </html>
