@@ -1,66 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Raspberry Pi Car</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {
-            text-align: center;
-            font-family: Arial;
-            background: #111;
-            color: white;
-        }
+<title>Raspberry Pi AI Car</title>
 
-        img {
-            width: 90%;
-            max-width: 400px;
-            border-radius: 10px;
-            margin-top: 10px;
-        }
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-        .controls {
-            margin-top: 20px;
-        }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
 
-        button {
-            width: 80px;
-            height: 60px;
-            font-size: 18px;
-            margin: 5px;
-            border-radius: 10px;
-            border: none;
-            background: #28a745;
-            color: white;
-        }
+<style>
 
-        button:active {
-            background: red;
-        }
-    </style>
+body{
+background:#111;
+color:white;
+text-align:center;
+font-family:Arial;
+}
+
+#video{
+width:90%;
+max-width:420px;
+border-radius:10px;
+}
+
+#joystick{
+width:220px;
+height:220px;
+margin:40px auto;
+}
+
+</style>
+
 </head>
+
 <body>
 
-<h2>🚗 Raspberry Pi WiFi Car</h2>
+<h2>🚗 Raspberry Pi Car Control</h2>
 
-<img src="/video">
+<img id="video" src="/video">
 
-<div class="controls">
-    <br>
-    <button onclick="send('forward')">↑</button><br>
-    <button onclick="send('left')">←</button>
-    <button onclick="send('stop')">■</button>
-    <button onclick="send('right')">→</button><br>
-    <button onclick="send('backward')">↓</button>
-</div>
+<div id="joystick"></div>
 
 <script>
-function send(action) {
-    fetch('/control', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: action})
+
+let lastCommand = "";
+
+var manager = nipplejs.create({
+    zone: document.getElementById('joystick'),
+    mode: 'static',
+    position: { left: '50%', top: '50%' },
+    color: 'red',
+    size:150
+});
+
+function send(action){
+
+    if(action === lastCommand){
+        return; // prevent duplicate commands
+    }
+
+    lastCommand = action;
+
+    fetch('/control',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:action})
     });
 }
+
+manager.on('move', function(evt,data){
+
+if(!data.angle){
+return;
+}
+
+var angle = data.angle.degree;
+
+if(angle >=45 && angle <135){
+send("forward");
+}
+else if(angle >=135 && angle <225){
+send("left");
+}
+else if(angle >=225 && angle <315){
+send("backward");
+}
+else{
+send("right");
+}
+
+});
+
+manager.on('end', function(){
+send("stop");
+lastCommand="";
+});
+
 </script>
 
 </body>
