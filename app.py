@@ -61,7 +61,8 @@ class LiveCamera:
 
 camera = LiveCamera(IP_CAMERA_URL)
 
-# No auto-stop timer — car runs as long as joystick is held
+# The browser and mobile client send a drive heartbeat while held. The watchdog
+# below stops the motors if that heartbeat disappears.
 
 # ---- MOTOR FUNCTIONS ----
 def stop():
@@ -88,6 +89,24 @@ def turn_right():
     IN3.off(); IN4.off()   # Motor B stop
     print("[MOTOR] RIGHT")
 
+# A lost Wi-Fi connection or closed app must never leave the motors powered.
+COMMAND_TIMEOUT_SECONDS = 0.9
+command_lock = threading.Lock()
+active_action = "stop"
+last_motion_at = 0.0
+
+
+def motor_watchdog():
+    global active_action
+    while True:
+        time.sleep(0.1)
+        with command_lock:
+            if active_action != "stop" and time.monotonic() - last_motion_at > COMMAND_TIMEOUT_SECONDS:
+                stop()
+                active_action = "stop"
+                print("[MOTOR] command timeout — stopped")
+
+
 # ---- VIDEO STREAM ----
 def generate_frames():
     while True:
@@ -111,17 +130,24 @@ def video():
 
 @app.route('/control', methods=['POST'])
 def control():
-    action = request.json.get("action", "stop")
+    global active_action, last_motion_at
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action")
     actions = {
-        "forward":  forward,
+        "forward": forward,
         "backward": backward,
-        "left":     turn_left,
-        "right":    turn_right,
-        "stop":     stop,
+        "left": turn_left,
+        "right": turn_right,
+        "stop": stop,
     }
     fn = actions.get(action)
-    if fn:
+    if fn is None:
+        return jsonify({"status": "error", "message": "unknown action"}), 400
+
+    with command_lock:
         fn()
+        active_action = action
+        last_motion_at = time.monotonic() if action != "stop" else 0.0
 
     return jsonify({"status": "ok", "action": action})
 
@@ -130,6 +156,7 @@ def status():
     return jsonify({"camera": camera.isOpened(), "status": "running"})
 
 if __name__ == '__main__':
+    threading.Thread(target=motor_watchdog, name="motor-watchdog", daemon=True).start()
     try:
         print("🚗 RPi Car Server on http://0.0.0.0:5000")
         app.run(host='0.0.0.0', port=5000, threaded=True)

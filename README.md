@@ -210,3 +210,21 @@ Add:
 # 🎉 Done!
 
 Your Raspberry Pi WiFi Car is ready 🚗🔥
+
+## Android app: Pi Rover
+
+The repository includes **Pi Rover**, a native Android controller for the Flask car server. It shows the live `/video` stream, connection and camera status, and hold-to-drive controls for forward, reverse, left, and right. Releasing a direction, leaving the app, or losing the connection sends Stop. The Pi server also has a command watchdog: if it does not receive a drive heartbeat for 0.9 seconds, it turns all motor outputs off.
+
+### Start the Pi server
+
+Start the existing Flask service on the Raspberry Pi and connect the phone to the same Wi-Fi network. Find the Pi's LAN address with `hostname -I`; the server listens on port `5000`.
+
+### Install the APK
+
+Every push to `main` or `master`, pull request, and manual workflow run builds a debug APK. In GitHub, open **Actions → Build Pi Rover APK → latest successful run** and download **Pi-Rover-APK**. Extract `app-debug.apk` from the ZIP and install it on the Android phone. The artifact is retained for 30 days.
+
+In Pi Rover, enter the Raspberry Pi address, for example `192.168.1.25:5000`, and tap **Connect**. The app remembers that address on the device. It does not contain camera or router credentials and does not require internet access; the phone and Pi need to share a local network.
+
+### Local network security
+
+The Flask server currently has no authentication and uses HTTP. Run it only on a trusted private network; anyone who can reach its `/control` endpoint can drive the car. Do not expose port `5000` to the public internet. The command watchdog limits a lost connection to at most 0.9 seconds of stale motion; it is a fail-safe, not a substitute for safe wiring and supervision.
