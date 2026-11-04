@@ -1,4 +1,4 @@
-name: Build Pi Rover APK
+name: Build Kavyacar APK
 
 on:
   push:
@@ -26,10 +26,12 @@ jobs:
           gradle-version: '8.9'
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
+      - name: Name APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/kavyacar.apk
       - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Pi-Rover-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Kavyacar-APK
+          path: app/build/outputs/apk/debug/kavyacar.apk
           if-no-files-found: error
           retention-days: 30

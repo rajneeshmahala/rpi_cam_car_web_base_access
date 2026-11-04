@@ -211,9 +211,9 @@ Add:
 
 Your Raspberry Pi WiFi Car is ready 🚗🔥
 
-## Android app: Pi Rover
+## Android app: Kavyacar
 
-The repository includes **Pi Rover**, a native Android controller for the Flask car server. It shows the live `/video` stream, connection and camera status, and hold-to-drive controls for forward, reverse, left, and right. Releasing a direction, leaving the app, or losing the connection sends Stop. The Pi server also has a command watchdog: if it does not receive a drive heartbeat for 0.9 seconds, it turns all motor outputs off.
+The repository includes **Kavyacar**, a native Android controller for the Flask car server. It shows the live `/video` stream, connection and camera status, and hold-to-drive controls for forward, reverse, left, and right. Releasing a direction, leaving the app, or losing the connection sends Stop. The Pi server also has a command watchdog: if it does not receive a drive heartbeat for 0.9 seconds, it turns all motor outputs off.
 
 ### Start the Pi server
 
@@ -221,9 +221,9 @@ Start the existing Flask service on the Raspberry Pi and connect the phone to th
 
 ### Install the APK
 
-Every push to `main` or `master`, pull request, and manual workflow run builds a debug APK. In GitHub, open **Actions → Build Pi Rover APK → latest successful run** and download **Pi-Rover-APK**. Extract `app-debug.apk` from the ZIP and install it on the Android phone. The artifact is retained for 30 days.
+Every push to `main` or `master`, pull request, and manual workflow run builds a debug APK. In GitHub, open **Actions → Build Kavyacar APK → latest successful run** and download **Kavyacar-APK**. Extract `kavyacar.apk` from the ZIP and install it on the Android phone. The artifact is retained for 30 days.
 
-In Pi Rover, enter the Raspberry Pi address, for example `192.168.1.25:5000`, and tap **Connect**. The app remembers that address on the device. It does not contain camera or router credentials and does not require internet access; the phone and Pi need to share a local network.
+In Kavyacar, enter the Raspberry Pi address, for example `192.168.1.25:5000`, and tap **Connect**. The app remembers that address on the device. It does not contain camera or router credentials and does not require internet access; the phone and Pi need to share a local network.
 
 ### Local network security
 

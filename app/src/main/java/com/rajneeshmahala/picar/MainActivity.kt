@@ -94,7 +94,7 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(20), dp(22), dp(14))
         }
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        brand.addView(label("PI ROVER", 22f, ink, true, "sans-serif-black"))
+        brand.addView(label("KAVYACAR", 22f, ink, true, "sans-serif-black"))
         brand.addView(label("CAMERA CAR CONTROL", 10f, muted, true, "sans-serif-medium").apply { letterSpacing = 0.12f; setPadding(0, dp(3), 0, 0) })
         top.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         val stopChip = label("■  STOP", 12f, red, true, "sans-serif-bold").apply {
